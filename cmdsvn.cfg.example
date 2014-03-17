@@ -1,0 +1,17 @@
+# This file is part of cmdsvn. See README for more information.
+h:            list-cmds
+help:         list-cmds
+q:            quit
+p:            echo you are here: %uri%
+cd ..:        go-up
+..:           go-up
+cd %a:        go-to %a%
+cat %a:       exec svn cat %uri%/%a%
+ls:           exec svn ls -v %uri%
+log:          pager svn log %uri%
+logv:         pager svn log -v %uri%
+log %a:       pager svn log %uri%/%a%
+logv %a:      pager svn log -v %uri%/%a%
+logl %a:      exec svn log %uri% -l %a%
+blame %a:     pager svn blame %uri%/%a%
+repo %a:      switch-repo %a%

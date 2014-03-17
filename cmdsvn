@@ -1,0 +1,292 @@
+#!/bin/bash
+
+# cmdsvn - interactive command line browser for Subversion repositories
+
+#   Copyright 2014 Sławomir Nizio
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+cmds=()
+specs=()
+
+repo=
+dirs=()
+
+_carry=
+
+error() {
+	echo "$*" 2>&1
+	exit 1
+}
+
+warn() {
+	echo "$*" 2>&1
+}
+
+add_cfg_line() {
+	local line=$1
+
+	[[ -z $line ]] && return
+
+	if [[ $line != *:* ]]; then
+		error "Line '$line' is invalid."
+	fi
+
+	local cmd spec
+	cmd=${line%%:*}
+	spec=${line#*:}
+	while [[ $spec = ' '* ]]; do
+		spec=${spec# }
+	done
+
+	cmds+=( "$cmd" )
+	specs+=( "$spec" )
+}
+
+parse_cfg() {
+	local line
+	while read -r line; do
+		[[ $line = '#'* ]] && continue
+		add_cfg_line "$line"
+	done < "$1"
+}
+
+get_ind_for_cmd() {
+	local usercmd=$1
+	set -f
+	set -- $1
+	set +f
+	local i cmd cmdwords cmdwlen
+
+	for (( i = 0; i < ${#cmds[@]}; i++ )); do
+		cmd=${cmds[i]}
+		set -f
+		cmdwords=( $cmd )
+		set +f
+		if [[ $cmd = "$usercmd" ]]; then
+			_carry=$i
+			return 0
+		fi
+	done
+
+	for (( i = 0; i < ${#cmds[@]}; i++ )); do
+		cmd=${cmds[i]}
+		set -f
+		cmdwords=( $cmd )
+		set +f
+		cmdwlen=${#cmdwords[@]}
+		# commands can take one argument: <command> <argument even with spaces>
+		if [[ $# -gt 1 && $cmdwlen -gt 1 && ${cmdwords[0]} = "$1" && ${cmdwords[1]} = "%a" ]]; then
+			_carry=$i
+			return 0
+		fi
+	done
+
+	_carry=-1
+	return 1
+}
+
+prepare_spec() {
+	local index=$1 dollar_a=$2 uri=$3
+	if [[ $index -ge ${#cmds[@]} ]]; then
+		error "do_command: $index -ge ${#cmds[@]}"
+	fi
+
+	local cmdword=${specs[$index]}
+	[[ -z $cmdword ]] && error "do_command: empty spec for $index"
+
+	# made to handle the case:
+	# if arg is 'file with spaces'
+	# and command is 'do stf with %a%'
+	# then the file name "continuity" should be continuous...
+	local newcmd oldcmd
+	set -f
+	newcmd=()
+	oldcmd=( $cmdword )
+	set +f
+
+	local i
+	for (( i = 0; i < ${#oldcmd[@]}; i++ )); do
+		local c=${oldcmd[i]}
+		# note: could be something like '%uri%/%a%'
+		c=${c//%a%/$dollar_a}
+		c=${c//%uri%/$uri}
+		newcmd+=( "$c" )
+	done
+
+	_carry=( "${newcmd[@]}" )
+}
+
+do_command() {
+	local cmdword=$1
+	shift
+
+	case $cmdword in
+	quit)
+		echo "Bye."
+		exit 0
+		;;
+	list-cmds)
+		local i
+		for (( i = 0; i < ${#cmds[@]}; i++ )); do
+			printf -- "--> %-15s %s\n" "${cmds[i]}" "${specs[$i]}"
+		done
+		;;
+	echo)
+		echo "$*"
+		;;
+	go-up)
+		local len=${#dirs[@]}
+		if [[ $len -eq 0 ]]; then
+			warn "cannot go up"
+		else
+			unset dirs[len-1]
+		fi
+		;;
+	go-to)
+		if [[ $* =~ ^/+$ ]]; then
+			warn "The location is relative to the current one."
+			warn "\`/' would make no sense - ignoring."
+		else
+			dirs+=( "$*" )
+		fi
+		;;
+	exec)
+		echo "executing: $*"
+		"$@"
+		;;
+	pager)
+		echo "executing: $* (with pager)"
+		"$@" | ${PAGER:-less}
+		;;
+	switch-repo)
+		echo "switching to $*"
+		repo=$*
+		dirs=()
+		;;
+	*)
+		warn "Invalid command '$cmdword'. Check your configuration file."
+	esac
+}
+
+handle_cmd() {
+	local inp=$1
+	if ! get_ind_for_cmd "$inp"; then
+		warn "Unknown command."
+		return
+	fi
+	local index=$_carry
+
+	# we want to preserve things like ' ugly file name'
+	# with '<cmd>  ugly file name'
+	local param=${inp#* }
+	local location
+	_cons_path
+	location=$_carry
+	prepare_spec $index "$param" "$location"
+	do_command "${_carry[@]}"
+}
+
+find_cmd_for_spec() {
+	# note: finds only the first one
+	local spec=$1
+	for (( i = 0; i < ${#specs[@]}; i++ )); do
+		if [[ $spec = "${specs[i]}" ]]; then
+			_carry=${cmds[i]}
+			return 0
+		fi
+	done
+	return 1
+}
+
+input_loop() {
+	local inp
+	while IFS= read -p '>>> ' inp; do
+		handle_cmd "$inp"
+	done
+}
+
+_strip_slashes() {
+	# strips slashes; if the string is ^/+$,
+	# the result will be a single slash
+	local str=$1
+	while [[ $str = */ ]]; do
+		str=${str%/}
+	done
+	while [[ $str = /* ]]; do
+		str=${str#/}
+	done
+	[[ -z $str ]] && str=/
+	_carry=$str
+}
+
+_cons_path() {
+	local p
+	local ret=$repo
+	for p in "${dirs[@]}"; do
+		ret=$ret/$p
+	done
+	_carry=$ret
+}
+
+welcome() {
+	local arg=$1
+	if [[ -z $arg ]]; then
+		echo "type repository URL to browse:"
+		echo -n ">>> "
+		read repo
+	else
+		repo=$arg
+	fi
+
+	[[ -z $repo ]] && error "Repository not specified."
+	_strip_slashes "$repo"
+	repo=$_carry
+
+	# be friendly
+	local quit_cmd="^C"
+	find_cmd_for_spec "quit" && quit_cmd=$_carry
+	local txt="Welcome! To quit, type $quit_cmd"
+	if find_cmd_for_spec "list-cmds"; then
+		txt+="; to get list of available commands, type $_carry."
+	else
+		txt+="."
+	fi
+	echo "$txt"
+}
+
+main() {
+	_default=$(cat <<'_END'
+	q: quit
+	cd %a: go-to %a%
+	log: pager svn log %uri%
+	ls: exec svn ls %uri%
+	h: list-cmds
+_END
+	)
+
+	local _cfg=${CMDSVN_CONFIG:-$HOME/.cmdsvn.cfg}
+	if [[ -f $_cfg && -r $_cfg ]]; then
+		parse_cfg "$_cfg"
+	else
+		warn "Configuration file $_cfg not found."
+		warn "Only a very limited set of commands will be available to you."
+		parse_cfg <(echo "$_default")
+	fi
+
+	welcome "$1"
+
+	input_loop
+}
+
+main "$@"

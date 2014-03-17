@@ -1,0 +1,34 @@
+This file explains format of the configuration file for cmdsvn.
+
+# This is a comment. Comments start with a hash symbol.
+
+The format is: <command>:<spec>
+and spaces after the colon are ignored to allow for readable formating
+of the file.
+
+Empty lines are ignored.
+
+A command may accept at most one parameter, denoted by %a on the left side.
+The paramter %a is accessible using variable %a% on the right side. Spaces
+and special characters are preserved in the parameter.
+
+List of functions
+=================
+
+list-cmds     Prints a list of defined commands.
+quit          Quits.
+echo ARG      Prints ARG.
+go-to         Adds a directory to the stack.
+go-up         Pops the directory stack.
+switch-repo ARG
+              Sets ARG as new repository root.
+exec          Executes a command (external application, usually, not not
+              limited to, svn).
+pager         As above, but pipes the output to the pager.
+
+List of variables
+=================
+
+They are accessible on the right side.
+%a%          Argument (%a on the left side).
+%uri%        Current URI.

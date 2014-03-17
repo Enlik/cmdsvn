@@ -1,0 +1,41 @@
+cmdsvn - interactive command line browser for Subversion repositories
+
+Think of it as a subset of TortoiseSVN that works on the command line.
+Requires GNU bash and Subversion command client.
+
+Invocation
+==========
+
+cmdsvn
+or
+cmdsvn <repository URI>
+and what commands are available depends on the configuration file.
+This part is extensible; see cmdsvn.cfg.example for an example.
+The file also explains the format and available functions.
+
+Configuration
+=============
+
+By default, cmdsvn looks for .cmdsvn.cfg in your home directory, or whatever
+is in CMDSVN_CONFIG. The latter takes priority.
+
+Note: configuration allows to run arbitrary (but user defined) commands.
+Don't use configuration from untrusted sources.
+
+If no configuration file can be found, a few built in commands are defined.
+Consider renaming cmdsvn.cfg.example as ~/.cmdsvn.cfg for more functionality.
+
+The format, available functions and variables is explained in the file
+configuration.txt.
+
+Why?
+====
+
+Because traversing a Subversion repository using multiple 'svn ls' command
+executions is not comfortable.
+
+Lincense
+========
+
+Licensed under the Apache License, Version 2.0. For more information see the
+file COPYING.
