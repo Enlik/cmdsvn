@@ -6,6 +6,7 @@ p:            echo you are here: %uri%
 cd ..:        go-up
 ..:           go-up
 cd %a:        go-to %a%
+cdp %a:       chain cd %a% + p
 cat %a:       exec svn cat %uri%/%a%
 ls:           exec svn ls -v %uri%
 log:          pager svn log %uri%

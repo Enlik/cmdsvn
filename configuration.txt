@@ -22,9 +22,14 @@ go-to         Adds a directory to the stack.
 go-up         Pops the directory stack.
 switch-repo ARG
               Sets ARG as new repository root.
-exec          Executes a command (external application, usually, not not
+exec          Executes a command (external application, usually, but not
               limited to, svn).
 pager         As above, but pipes the output to the pager.
+chain         Use it to "chain" commands (execute a few of them with one
+              command) or create aliases. Commands are separated by a plus
+              character, optionally separated by spaces for better
+              readability.
+
 
 List of variables
 =================

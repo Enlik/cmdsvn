@@ -23,6 +23,7 @@ repo=
 dirs=()
 
 _carry=
+_handle_cmd_frame=
 
 error() {
 	echo "$*" 2>&1
@@ -99,11 +100,11 @@ get_ind_for_cmd() {
 prepare_spec() {
 	local index=$1 dollar_a=$2 uri=$3
 	if [[ $index -ge ${#cmds[@]} ]]; then
-		error "do_command: $index -ge ${#cmds[@]}"
+		error "prepare_spec: $index -ge ${#cmds[@]}"
 	fi
 
 	local cmdword=${specs[$index]}
-	[[ -z $cmdword ]] && error "do_command: empty spec for $index"
+	[[ -z $cmdword ]] && error "prepare_spec: empty spec for $index"
 
 	# made to handle the case:
 	# if arg is 'file with spaces'
@@ -174,27 +175,66 @@ do_command() {
 		repo=$*
 		dirs=()
 		;;
+	chain)
+		local cmd
+		local my_cmds=()
+
+		local s=$*
+		while [[ $s = *+* ]]; do
+			local head=${s%%+*}
+			s=${s#*+}
+			# a space between + allowed for readability
+			# (other spaces are "stripped" by looping
+			# earlier)
+			head=${head% }
+			s=${s# }
+			my_cmds+=( "$head" )
+		done
+
+		my_cmds+=( "$s" )
+
+		for cmd in "${my_cmds[@]}"; do
+			if [[ -n $cmd ]]; then
+				_handle_cmd_stacked "$cmd" || break
+			fi
+		done
+		;;
 	*)
 		warn "Invalid command '$cmdword'. Check your configuration file."
 	esac
 }
 
-handle_cmd() {
+_handle_cmd_stacked() {
+	let _handle_cmd_frame++
+	if [[ $_handle_cmd_frame -gt 2 ]]; then
+		warn "Command handler: too many frames (infinite 'chain'?)."
+		let _handle_cmd_frame--
+		return 1
+	fi
+
 	local inp=$1
 	if ! get_ind_for_cmd "$inp"; then
 		warn "Unknown command."
-		return
+		let _handle_cmd_frame--
+		return 1
 	fi
 	local index=$_carry
 
 	# we want to preserve things like ' ugly file name'
-	# with '<cmd>  ugly file name'
+	# with '<cmd>  ugly file name' (user input)
 	local param=${inp#* }
 	local location
 	_cons_path
 	location=$_carry
 	prepare_spec $index "$param" "$location"
 	do_command "${_carry[@]}"
+	let _handle_cmd_frame--
+	return 0
+}
+
+handle_cmd() {
+	_handle_cmd_frame=0
+	_handle_cmd_stacked "$@"
 }
 
 find_cmd_for_spec() {
