@@ -15,3 +15,4 @@ logv %a:      pager svn log -v %uri%/%a%
 logl %a:      exec svn log %uri% -l %a%
 blame %a:     pager svn blame %uri%/%a%
 repo %a:      switch-repo %a%
+show %a:      pager svn diff -c %a% %uri%
