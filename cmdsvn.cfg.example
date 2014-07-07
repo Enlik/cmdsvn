@@ -7,7 +7,9 @@ cd ..:        go-up
 ..:           go-up
 cd %a:        go-to %a%
 cdp %a:       chain cd %a% + p
+cdm %a:       go-to-match %a%
 cat %a:       exec svn cat %uri%/%a%
+ls-:          list-items
 ls:           exec svn ls -v %uri%
 log:          pager svn log %uri%
 logv:         pager svn log -v %uri%

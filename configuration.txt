@@ -16,9 +16,15 @@ List of functions
 =================
 
 list-cmds     Prints a list of defined commands.
+list-items    Prints items in the current location (using svn list). Basically
+              it's the same as if "exec svn list %uri%" was used, except that
+              it remembers the output for the current location until the
+              location is changed.
 quit          Quits.
 echo ARG      Prints ARG.
 go-to         Adds a directory to the stack.
+go-to-match   Adds a directory to the stack. Accepts bash patterns. If there
+              are many matches, an interactive prompt is displayed.
 go-up         Pops the directory stack.
 switch-repo ARG
               Sets ARG as new repository root.

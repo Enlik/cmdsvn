@@ -22,6 +22,10 @@ specs=()
 repo=
 dirs=()
 
+lastloc_items=()
+lastloc_items_loc=
+lastloc_items_raw_output=
+
 _carry=
 _handle_cmd_frame=
 
@@ -97,6 +101,38 @@ get_ind_for_cmd() {
 	return 1
 }
 
+remember_items_for_current_loc() {
+		_cons_path
+		local location=$_carry
+		if ! _remember_items "$location"; then
+			return 1
+		fi
+		return 0
+}
+
+_remember_items() {
+	local loc=$1
+
+	local output
+
+	if [[ $loc = $lastloc_items_loc ]]; then
+		output=$lastloc_items_raw_output
+	else
+		output=$(svn list "$loc") || return 1
+		lastloc_items=()
+
+		local item
+		while read -r item; do
+			lastloc_items+=( "$item" )
+		done <<< "$output"
+
+		lastloc_items_loc=$loc
+		lastloc_items_raw_output=$output
+	fi
+
+	return 0
+}
+
 prepare_spec() {
 	local index=$1 dollar_a=$2 uri=$3
 	if [[ $index -ge ${#cmds[@]} ]]; then
@@ -146,6 +182,15 @@ do_command() {
 	echo)
 		echo "$*"
 		;;
+	list-items)
+		if remember_items_for_current_loc; then
+			# svn list may probably do some nice escaping, so we'll just
+			# use that instead of printing items from the array
+			echo "$lastloc_items_raw_output"
+		else
+			warn "svn list failed"
+		fi
+		;;
 	go-up)
 		local len=${#dirs[@]}
 		if [[ $len -eq 0 ]]; then
@@ -160,6 +205,45 @@ do_command() {
 			warn "\`/' would make no sense - ignoring."
 		else
 			dirs+=( "$*" )
+		fi
+		;;
+	go-to-match)
+		# get input and go to the location that matches
+		# if more locations matches, make it an interactive choice
+		if ! remember_items_for_current_loc; then
+			warn "svn list failed (wrong directory?)"
+			return
+		fi
+
+		local matches=()
+		local input=$*
+		input=${input%/}
+
+		local candidate cnd
+		for candidate in "${lastloc_items[@]}"; do
+			cnd=${candidate%/}
+			if [[ $cnd = $input ]]; then
+				matches+=( "$cnd" )
+			fi
+		done
+
+		if [[ ${#matches[@]} -eq 0 ]]; then
+			echo "no matches"
+		elif [[ ${#matches[@]} -eq 1 ]]; then
+			echo "going to ${matches[0]}"
+			dirs+=( "${matches[0]}" )
+		else
+			local sel
+			select sel in "${matches[@]}"; do
+				break
+			done
+
+			if [[ -n $sel ]]; then
+				echo "going to $sel"
+				dirs+=( "$sel" )
+			else
+				echo "Cancelled."
+			fi
 		fi
 		;;
 	exec)
